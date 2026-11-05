@@ -1,19 +1,39 @@
 flowchart LR
-    User[AVD Session Host<br/>Spoke VNet] -->|DNS Query| ADDS1[AD DS DNS Server 1<br/>10.1.1.4]
-    User -->|DNS Query| ADDS2[AD DS DNS Server 2<br/>10.1.1.5]
+    subgraph HUB["Hub VNet (10.0.0.0/16)"]
+        subgraph PESN["Private_EndPoint Subnet (10.0.100.0/24)"]
+            SAPE["PE - Storage (file)"]
+            KVPE["PE - Key Vault (vault)"]
+        end
+        PDNSF["Private DNS Zone\nprivatelink.file.core.windows.net"]
+        PDNSK["Private DNS Zone\nprivatelink.vaultcore.azure.net"]
+    end
 
-    ADDS1 -->|Conditional Forwarder<br/>privatelink.file.core.windows.net| AZDNS[Azure DNS<br/>168.63.129.16]
-    ADDS1 -->|Conditional Forwarder<br/>privatelink.vaultcore.azure.net| AZDNS
-    ADDS2 -->|Same forwarders| AZDNS
+    subgraph SPOKE["Spoke VNet (10.1.0.0/16)"]
+        subgraph DCNET["Domain-Controller Subnet (10.1.1.0/24)"]
+            ADDS1["AD DS DNS 1\n10.1.1.4"]
+            ADDS2["AD DS DNS 2\n10.1.1.5"]
+        end
+        subgraph AVDNET["AVD Subnet (10.1.2.0/24)"]
+            AVDH["AVD Session Host"]
+        end
+    end
 
-    AZDNS --> PDNS1[Private DNS Zone<br/>privatelink.file.core.windows.net]
-    AZDNS --> PDNS2[Private DNS Zone<br/>privatelink.vaultcore.azure.net]
+    AZDNS["Azure DNS\n168.63.129.16"]
+    SA["Azure Files Premium\n(FileStorage)"]
+    KV["Azure Key Vault"]
 
-    PDNS1 --> SAPE[Storage Private Endpoint<br/>Hub PE Subnet]
-    PDNS2 --> KVPE[Key Vault Private Endpoint<br/>Hub PE Subnet]
+    AVDH -->|"DNS query"| ADDS1
+    AVDH -->|"DNS query"| ADDS2
+    ADDS1 -->|"Conditional forwarder\nprivatelink.file.core.windows.net"| AZDNS
+    ADDS1 -->|"Conditional forwarder\nprivatelink.vaultcore.azure.net"| AZDNS
+    ADDS2 -->|"Same forwarders"| AZDNS
 
-    User -->|Private IP path via peering/routing| SAPE
-    User -->|Private IP path via peering/routing| KVPE
+    AZDNS --> PDNSF
+    AZDNS --> PDNSK
+    PDNSF --> SAPE
+    PDNSK --> KVPE
 
-    SAPE --> SA[Azure Files Premium<br/>FileStorage]
-    KVPE --> KV[Azure Key Vault]
+    AVDH -->|"Private IP path via peering/routing"| SAPE
+    AVDH -->|"Private IP path via peering/routing"| KVPE
+    SAPE --> SA
+    KVPE --> KV
