@@ -70,11 +70,13 @@ To make the flow clear, this is the model used in this implementation:
    - `privatelink.vaultcore.azure.net`
 5. Confirm VNet DNS settings point to AD DS DNS IPs.
 
+## Network Design
+
+![Hub VNet overview + subnets](docs/00-design-hub-spoke-and-dns.png)
+
 [SCREENSHOT: 00-A - Hub VNet and PE subnet]  
 [SCREENSHOT: 00-B - Spoke VNet and AVD subnet]  
 [SCREENSHOT: 00-C - VNet DNS settings using AD DS DNS]
-
-![Hub VNet overview + subnets](docs/00-design-hub-spoke-and-dns.png)
 
 ## Step 1 - Create Storage Account for AVD Files Premium
 
