@@ -38,7 +38,6 @@ Build a repeatable private-access baseline for AVD that uses:
 ## Portal checkpoints to capture (screenshots)
 
 - [SCREENSHOT: 01-A - Hub VNet overview + subnets]
-![alt text](image.png)
 - [SCREENSHOT: 01-B - Spoke VNet overview + AVD subnet]
 - [SCREENSHOT: 01-C - VNet peering status (Hub <-> Spoke)]
 - [SCREENSHOT: 01-D - Custom DNS servers on both VNets]

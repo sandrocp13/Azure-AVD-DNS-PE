@@ -62,35 +62,41 @@ To make the flow clear, this is the model used in this implementation:
 
 ## Step 0 - Prerequisites
 
+The following Network Diagram shows the basic components that we will need to validate. 
 1. Confirm Hub/Spoke VNets are deployed and peered.
-2. Confirm dedicated PE subnet exists in Hub.
+   We need to confirm the communication is allowed between VNets. For AVD deployments is common to have Domain Controllers on-premises and that communication must flow accross communication links, that could be ExpressRoute or Site-to-Site VPN.
+2. Confirm dedicated Private Endpoins (PE) subnet exists in Hub.
+   Private Endpoint can be defined as a Virtual Network Adapter deployed in a Azure VNet. Just for standarization porpose, I defined to have one dedicated subnet inside Hub VNet just for PE.
 3. Confirm AD DS DNS servers are reachable from AVD subnets.
+   Active Directory relly on DNS so, it is imperative to validate the name resolution accross all VNets and subnets.
 4. Confirm or create private DNS zones:
+   We need to validate the Private DNS Zones are created and proper configured.
    - `privatelink.file.core.windows.net`
    - `privatelink.vaultcore.azure.net`
-5. Confirm VNet DNS settings point to AD DS DNS IPs.
+   Each Private DNS Zone created must be linked to the VNets we designed for PE and the VMs that will use that Zone for resolution. 
+5. Confirm VNet Custom DNS settings point to AD DS DNS IPs.
+   Custom DNS requires that all VNets need to be configured to use the DNS Server other then Azure DNS, in this case, the DNS Servers must resolve AD DS services.
 
 ## Network Design
 
 ![Hub VNet overview + subnets](docs/00-design-hub-spoke-and-dns.png)
 
-[SCREENSHOT: 00-A - Hub VNet and PE subnet]  
-[SCREENSHOT: 00-B - Spoke VNet and AVD subnet]  
-[SCREENSHOT: 00-C - VNet DNS settings using AD DS DNS]
-
 ## Step 1 - Create Storage Account for AVD Files Premium
+I will highlight only the most important parameters.
 
 1. Go to **Storage accounts** > **Create**.
 2. Set:
-   - Account kind: **FileStorage**
-   - Performance: **Premium**
+   - Select **Subscription**
+   - Select or create a **Resource Group**
+   - Define the **Storage Account Name**
+   - Select the **Region**
+   - Primary service: **Azure Files**
+   - Media tier: **Premium**
+   - File share billing **Provisioned v2**
    - Redundancy: **LRS**
-3. In Networking, set public access based on rollout policy (final state should be private-only).
+![Storage Account](docs/00-Storage-Account.png)
+3. In Advanced, select **Enable Managed Identity for SMB** under Azure Files
 4. Create the file share for FSLogix profiles.
-
-[SCREENSHOT: 01-A - Storage account basics]  
-[SCREENSHOT: 01-B - Storage networking settings]  
-[SCREENSHOT: 01-C - Premium file share created]
 
 ## Step 2 - Create Storage Private Endpoint in Hub
 
@@ -99,10 +105,7 @@ To make the flow clear, this is the model used in this implementation:
 3. Place PE in Hub VNet PE subnet.
 4. Integrate with `privatelink.file.core.windows.net`.
 5. Confirm PE status is **Approved**.
-
-[SCREENSHOT: 02-A - Storage PE creation wizard]  
-[SCREENSHOT: 02-B - PE subnet in Hub]  
-[SCREENSHOT: 02-C - PE connection approved]
+![PE Creation](docs/00-Private-Endpoint.png)
 
 ## Step 3 - Configure AD DS DNS conditional forwarders
 
@@ -114,8 +117,9 @@ To make the flow clear, this is the model used in this implementation:
 
 Why: the DNS server inside Azure receives the query and forwards Azure private-link zones to Azure DNS.
 
-[SCREENSHOT: 03-A - Conditional forwarder for file zone]  
-[SCREENSHOT: 03-B - Conditional forwarder for key vault zone]
+
+![Conditional forwarder for file zone](docs/03-A-Conditional-forwarder-for-file-zone.png)  
+![Conditional forwarder for key vault zone](docs/03-A-Conditional-forwarder-for-key-vault.png)
 
 ## Step 4 - Create Key Vault Private Endpoint in Hub
 
