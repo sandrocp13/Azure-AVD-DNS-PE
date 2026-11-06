@@ -4,13 +4,19 @@
 
 Provide a single architecture view that explains:
 
-1. Hub VNet with dedicated Private Endpoint subnet.
+1. Hub VNet with a dedicated Private Endpoint subnet.
+![00-A - Hub VNet and PE subnet](./00-A-Hub-VNet-and-PE-subnet.png)
 2. Spoke VNet with AVD subnet and Domain Controller subnet.
+![00-B - Spoke VNet and AVD subnet](./00-B-Spoke-VNet-and-AVD-subnet.png)
 3. VNet DNS settings pointing to AD DS DNS servers.
+![00-C - VNet DNS settings using AD DS DNS](./00-C-VNet-DNS-settings-using-AD-DS-DNS.png)
 4. Conditional forwarders on AD DS DNS to Azure DNS (`168.63.129.16`).
+![00-D - Conditional forwarders on AD DS DNS to Azure DNS - Azure Files](./03-A-Conditional-forwarder-for-file-zone.png)
+![00-D - Conditional forwarders on AD DS DNS to Azure DNS - Azure Key Vault](./03-A-Conditional-forwarder-for-key-vault.png)
 5. Private DNS zones for Storage and Key Vault.
+![00-E - Private DNS zones for Storage and Key Vault](./00-E-Private-DNS-zones-for-Storage-and-Key-Vault.png)
 
-## Architecture diagram (Mermaid)
+## Architecture diagram
 
 ```mermaid
 flowchart LR
@@ -53,15 +59,6 @@ flowchart LR
     SAPE --> SA
     KVPE --> KV
 ```
-
-## Screenshot mapping for Step 0
-
-- [SCREENSHOT: 00-A - Hub VNet and PE subnet]
-  - Capture the Hub VNet overview and show `Private_EndPoint` subnet.
-- [SCREENSHOT: 00-B - Spoke VNet and AVD subnet]
-  - Capture the Spoke VNet overview and show `Domain-Controller` + `AVD` subnets.
-- [SCREENSHOT: 00-C - VNet DNS settings using AD DS DNS]
-  - Capture DNS server settings showing AD DS DNS IPs (`10.1.1.4`, `10.1.1.5`) on Hub/Spoke VNets.
 
 ## Design decisions summary
 

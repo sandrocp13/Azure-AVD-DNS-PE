@@ -1,6 +1,6 @@
-# Azure AVD Private Endpoint + Custom DNS Baseline
+# Azure Private Endpoint for AVD with Custom DNS Configuration Guide 
 
-This guide was created to help professionals understand how Private Endpoints work in Azure, with a special focus on DNS resolution, implementation, and troubleshooting. I chose an Azure Virtual Desktop (AVD) scenario to provide practical context. Because this guide is intended to explain how the solution works end to end, all steps are shown using the Azure portal. The approach is aligned with the AVD Accelerator guidance (https://github.com/Azure/avdaccelerator).
+This guide helps IT professionals understand how Azure Private Endpoints work, including implementation and troubleshooting. I use an Azure Virtual Desktop (AVD) scenario to provide practical context. Because this guide explains the solution end to end, all steps are shown in the Azure portal. The approach is aligned with AVD Accelerator guidance (https://github.com/Azure/avdaccelerator).
 
 ## Guide format
 
@@ -62,27 +62,27 @@ To make the flow clear, this is the model used in this implementation:
 
 ## Step 0 - Prerequisites
 
-The following Network Diagram shows the basic components that we will need to validate. 
+The network design below shows the core components to validate.
 1. Confirm Hub/Spoke VNets are deployed and peered.
-   We need to confirm the communication is allowed between VNets. For AVD deployments is common to have Domain Controllers on-premises and that communication must flow accross communication links, that could be ExpressRoute or Site-to-Site VPN.
-2. Confirm dedicated Private Endpoins (PE) subnet exists in Hub.
-   Private Endpoint can be defined as a Virtual Network Adapter deployed in a Azure VNet. Just for standarization porpose, I defined to have one dedicated subnet inside Hub VNet just for PE.
+   Confirm communication is allowed between VNets. In AVD deployments, Domain Controllers are often on-premises, so communication must flow across connectivity links such as ExpressRoute or Site-to-Site VPN.
+2. Confirm a dedicated Private Endpoint (PE) subnet exists in the Hub.
+   A Private Endpoint is a network interface deployed in an Azure VNet. For standardization, this guide uses one dedicated subnet in the Hub VNet for Private Endpoints.
 3. Confirm AD DS DNS servers are reachable from AVD subnets.
-   Active Directory relly on DNS so, it is imperative to validate the name resolution accross all VNets and subnets.
+   Active Directory relies on DNS, so validating name resolution across all VNets and subnets is required.
 4. Confirm or create private DNS zones:
-   We need to validate the Private DNS Zones are created and proper configured.
+   Validate that the private DNS zones are created and correctly configured.
    - `privatelink.file.core.windows.net`
    - `privatelink.vaultcore.azure.net`
-   Each Private DNS Zone created must be linked to the VNets we designed for PE and the VMs that will use that Zone for resolution. 
-5. Confirm VNet Custom DNS settings point to AD DS DNS IPs.
-   Custom DNS requires that all VNets need to be configured to use the DNS Server other then Azure DNS, in this case, the DNS Servers must resolve AD DS services.
+   Each private DNS zone must be linked to the VNets that host the Private Endpoints and the VMs that require name resolution.
+5. Confirm VNet custom DNS settings point to AD DS DNS IPs.
+   With custom DNS, VNets must use your DNS servers instead of Azure-provided DNS. In this design, those DNS servers resolve AD DS services.
 
 ## Network Design
 
 ![Hub VNet overview + subnets](docs/00-design-hub-spoke-and-dns.png)
 
 ## Step 1 - Create Storage Account for AVD Files Premium
-I will highlight only the most important parameters.
+This section highlights only the most important parameters.
 
 1. Go to **Storage accounts** > **Create**.
 2. Set:
@@ -95,19 +95,55 @@ I will highlight only the most important parameters.
    - File share billing **Provisioned v2**
    - Redundancy: **LRS**
 ![Storage Account](docs/00-Storage-Account.png)
-3. In Advanced, select **Enable Managed Identity for SMB** under Azure Files
+3. In **Advanced**, select **Enable managed identity for SMB** under Azure Files.
 4. Create the file share for FSLogix profiles.
 
-## Step 2 - Create Storage Private Endpoint in Hub
 
-1. Open the storage account > **Networking** > **Private endpoint connections** > **+ Private endpoint**.
-2. Select sub-resource: **file**.
-3. Place PE in Hub VNet PE subnet.
-4. Integrate with `privatelink.file.core.windows.net`.
-5. Confirm PE status is **Approved**.
-![PE Creation](docs/00-Private-Endpoint.png)
+## Step 2 - Check the Storage Account Public Endpoint
 
-## Step 3 - Configure AD DS DNS conditional forwarders
+Get the storage account FQDN from:
+![Storage Account FQDN](docs/03-Storage-Account-FQDN.png)
+
+From AVD session host or DNS server, validate:
+
+```powershell
+nslookup <storageaccount>.file.core.windows.net
+Test-NetConnection <storageaccount>.file.core.windows.net -Port 445
+```
+![Storage Account Public Endpoint](docs/03-Storage-Account-Public_endpoint.png)
+
+Validate that the storage account resolves to a public IP and that the storage account aliases match the public endpoint. This baseline is important for the next steps. At this stage, only the public alias exists. After creating the Private Endpoint, additional private-link records and aliases will appear.
+
+## Step 3 - Create Storage Private Endpoint in Hub
+
+Now create a Private Endpoint for the newly created storage account.
+
+1. Open the storage account > **Networking** > **Private endpoint** > **Create private endpoint**.
+2. Define **Name** and **Network Interface Name** for the virtual adapter that will be created in the Private Endpoint subnet.
+![Private Endpoint Basic](docs/00-Private-Endpoint-basic.png)
+3. Select target sub-resource: **file**.
+4. Place the PE in the Hub VNet Private Endpoint subnet.
+![Private Endpoint Network](docs/03-Private-Endpoint-network.png)
+5. Integrate with `privatelink.file.core.windows.net`.
+![Private Endpoint DNS](docs/03-Private-Endpoint-DNS.png)
+6. Confirm PE status is **Approved**.
+![PE Creation](docs/03-Private-Endpoint-Approved.png)
+
+## Step 4 - Check the Storage Account Private Endpoint
+
+Repeat the validation from Step 2 and review what changed.
+
+From AVD session host or DNS server, validate:
+
+```powershell
+nslookup <storageaccount>.file.core.windows.net
+Test-NetConnection <storageaccount>.file.core.windows.net -Port 445
+```
+![Storage Account Private Endpoint](docs/03-Storage-Account-Private_endpoint.png)
+
+Validate that the storage account now resolves to a private IP and that `privatelink` appears in the resolved DNS path.
+
+## Step 5 - Configure AD DS DNS conditional forwarders
 
 1. On Azure-hosted Domain Controller DNS server(s), open **DNS Manager**.
 2. Under **Conditional Forwarders**, add:
@@ -116,12 +152,10 @@ I will highlight only the most important parameters.
 3. Replicate in AD as required.
 
 Why: the DNS server inside Azure receives the query and forwards Azure private-link zones to Azure DNS.
-
-
 ![Conditional forwarder for file zone](docs/03-A-Conditional-forwarder-for-file-zone.png)  
 ![Conditional forwarder for key vault zone](docs/03-A-Conditional-forwarder-for-key-vault.png)
 
-## Step 4 - Create Key Vault Private Endpoint in Hub
+## Step 6 - Create Key Vault Private Endpoint in Hub
 
 1. Open Key Vault > **Networking** > **Private endpoint connections** > **+ Private endpoint**.
 2. Select sub-resource: **vault**.
@@ -132,7 +166,7 @@ Why: the DNS server inside Azure receives the query and forwards Azure private-l
 [SCREENSHOT: 04-A - Key Vault PE creation wizard]  
 [SCREENSHOT: 04-B - Key Vault PE approved]
 
-## Step 5 - Validate end to end
+## Step 7 - Validate end to end
 
 From AVD session host and DNS server, validate:
 
@@ -145,11 +179,13 @@ Test-NetConnection <keyvault>.vault.azure.net -Port 443
 
 Expected result: DNS resolves to private IPs and network access works through private endpoints.
 
+
+
 [SCREENSHOT: 05-A - nslookup storage private IP]  
 [SCREENSHOT: 05-B - nslookup key vault private IP]  
 [SCREENSHOT: 05-C - port 445 test success]
 
-## Step 6 - Screenshot redaction and publishing checklist
+## Step 8 - Screenshot redaction and publishing checklist
 
 Before publishing:
 
